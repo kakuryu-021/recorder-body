@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Recorder-Body</title>
+    <link rel="icon" type="image/png" href="icon.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --card-color: #1c1c1e;
+            --text-main: #ffffff;
+            --text-sub: #ebebf599;
+            --accent: #0a84ff;
+            --border: #38383a;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding-top: 50px; 
+            padding-bottom: 120px; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        header {
+            position: fixed; top: 0; left: 0; width: 100%;
+            background-color: rgba(28, 28, 30, 0.9);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            text-align: center; padding: 15px 0;
+            font-weight: bold; font-size: 1.1em;
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+        }
+
+        .tab-content { display: none; padding: 15px; max-width: 600px; margin: auto; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        #tab-graph.active {
+            display: flex;
+            flex-direction: column;
+            max-width: 100%; 
+            padding: 10px 5px; 
+            height: calc(100vh - 160px); 
+            box-sizing: border-box;
+        }
+        .graph-header { display: flex; justify-content: flex-end; padding: 0 10px 10px 0; }
+        select.graph-selector {
+            background-color: var(--card-color); color: var(--text-main);
+            border: 1px solid var(--border); padding: 8px 12px;
+            border-radius: 8px; font-size: 1em; outline: none;
+        }
+        .chart-container { position: relative; flex-grow: 1; width: 100%; }
+
+        .form-group { background: var(--card-color); padding: 12px 15px; margin-bottom: 10px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+        label { font-size: 0.95em; font-weight: 500; }
+        input[type="number"], input[type="date"] { 
+            width: 45%; padding: 8px; text-align: right; font-size: 1em;
+            background-color: transparent; border: none; color: var(--text-main); outline: none; color-scheme: dark;
+        }
+        input::placeholder { color: var(--text-sub); }
+        
+        button.save-btn { 
+            width: 100%; padding: 16px; background-color: var(--accent); color: white; 
+            border: none; border-radius: 12px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin-top: 15px; 
+        }
+
+        .table-container { background: var(--card-color); border-radius: 12px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        th, td { border-bottom: 1px solid var(--border); padding: 12px 8px; text-align: center; white-space: nowrap; }
+        th { color: var(--text-sub); font-weight: normal; }
+        tr:last-child td { border-bottom: none; }
+
+        nav {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background-color: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border);
+            display: flex; justify-content: space-around; 
+            padding-top: 10px; padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            box-sizing: border-box; z-index: 9999; 
+        }
+        .nav-item {
+            flex: 1; text-align: center; padding: 5px 0; color: var(--text-sub);
+            font-size: 0.75em; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .nav-item.active { color: var(--accent); }
+        .nav-icon { font-size: 1.6em; }
+    </style>
+</head>
+<body>
+
+    <header>記録</header>
+
+    <div id="tab-input" class="tab-content active">
+        <div class="form-group" style="background: transparent; border: 1px solid var(--border);">
+            <label>日付</label><input type="date" id="date" required style="width: 60%;">
+        </div>
+        <div class="form-group"><label>体重 (kg)</label><input type="number" id="weight" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>体脂肪率 (%)</label><input type="number" id="bodyfat" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>筋肉量 (kg)</label><input type="number" id="muscle" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>基礎代謝量 (kcal)</label><input type="number" id="bmr" step="1" inputmode="numeric" placeholder="0"></div>
+        <div class="form-group"><label>バスト 0° (cm)</label><input type="number" id="bust0" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>アンダー 0° (cm)</label><input type="number" id="underbust0" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>バスト 30° (cm)</label><input type="number" id="bust30" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>アンダー 30° (cm)</label><input type="number" id="underbust30" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>ウエスト (cm)</label><input type="number" id="waist" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>ヒップ (cm)</label><input type="number" id="hip" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>太もも (cm)</label><input type="number" id="thigh" step="0.1" inputmode="decimal" placeholder="0.0"></div>
+        <div class="form-group"><label>豆乳 (ml)</label><input type="number" id="soymilk" step="10" inputmode="numeric" placeholder="0"></div>
+
+        <button class="save-btn" onclick="saveData()">記録する</button>
+    </div>
+
+    <div id="tab-graph" class="tab-content">
+        <div class="graph-header">
+            <select id="graphMetric" class="graph-selector" onchange="displayData()">
+                <option value="weight">体重</option>
+                <option value="bodyfat">体脂肪率</option>
+                <option value="muscle">筋肉量</option>
+                <option value="bmr">基礎代謝量</option>
+                <option value="bust0">バスト 0°</option>
+                <option value="underbust0">アンダー 0°</option>
+                <option value="bust30">バスト 30°</option>
+                <option value="underbust30">アンダー 30°</option>
+                <option value="waist">ウエスト</option>
+                <option value="hip">ヒップ</option>
+                <option value="thigh">太もも</option>
+                <option value="soymilk">豆乳</option>
+            </select>
+        </div>
+        <div class="chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <div id="tab-history" class="tab-content">
+        <div class="table-container">
+            <table id="recordTable">
+                <thead>
+                    <tr><th>日付</th><th>体重</th><th>体脂肪</th><th>筋肉量</th><th>代謝</th><th>B(0)</th><th>UB(0)</th><th>B(30)</th><th>UB(30)</th><th>W</th><th>H</th><th>太もも</th><th>豆乳</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-settings" class="tab-content">
+        <h3 style="text-align: center; color: var(--text-main); margin-top: 0;">各項目の目標値</h3>
+        <div class="form-group"><label>体重 (kg)</label><input type="number" id="goal_weight" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>体脂肪率 (%)</label><input type="number" id="goal_bodyfat" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>筋肉量 (kg)</label><input type="number" id="goal_muscle" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>基礎代謝量 (kcal)</label><input type="number" id="goal_bmr" step="1" inputmode="numeric"></div>
+        <div class="form-group"><label>バスト 0° (cm)</label><input type="number" id="goal_bust0" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>アンダー 0° (cm)</label><input type="number" id="goal_underbust0" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>バスト 30° (cm)</label><input type="number" id="goal_bust30" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>アンダー 30° (cm)</label><input type="number" id="goal_underbust30" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>ウエスト (cm)</label><input type="number" id="goal_waist" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>ヒップ (cm)</label><input type="number" id="goal_hip" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>太もも (cm)</label><input type="number" id="goal_thigh" step="0.1" inputmode="decimal"></div>
+        <div class="form-group"><label>豆乳 (ml)</label><input type="number" id="goal_soymilk" step="10" inputmode="numeric"></div>
+
+        <button class="save-btn" style="background-color: #34c759; margin-bottom: 30px;" onclick="saveGoals()">目標を保存</button>
+
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+        <h3 style="text-align: center; color: var(--text-main);">データ管理・引き継ぎ</h3>
+        
+        <button class="save-btn" style="background-color: #5e5ce6; margin-bottom: 20px;" onclick="exportCSV()">エクセル用データ出力 (CSV)</button>
+
+        <div style="background: var(--card-color); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+            <p style="font-size: 0.9em; color: var(--text-sub); margin-top: 0; text-align: center;">デバイス変更時のデータ移行</p>
+            <button class="save-btn" style="background-color: #ff9f0a; margin-top: 0; margin-bottom: 10px;" onclick="exportBackup()">引き継ぎデータを作成 (書き出し)</button>
+            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importBackup(event)">
+            <button class="save-btn" style="background-color: #ff3b30; margin-top: 0;" onclick="document.getElementById('importFile').click()">引き継ぎデータを読み込む (復元)</button>
+        </div>
+    </div>
+
+    <nav>
+        <div class="nav-item active" onclick="switchTab('input', this)"><span class="nav-icon">📝</span><span>入力</span></div>
+        <div class="nav-item" onclick="switchTab('graph', this)"><span class="nav-icon">📈</span><span>グラフ</span></div>
+        <div class="nav-item" onclick="switchTab('history', this)"><span class="nav-icon">📋</span><span>履歴</span></div>
+        <div class="nav-item" onclick="switchTab('settings', this)"><span class="nav-icon">⚙️</span><span>設定</span></div>
+    </nav>
+
+    <script>
+        let myChartInstance = null;
+
+        const metricInfo = {
+            weight: { label: '体重', unit: 'kg' },
+            bodyfat: { label: '体脂肪率', unit: '%' },
+            muscle: { label: '筋肉量', unit: 'kg' },
+            bmr: { label: '基礎代謝量', unit: 'kcal' },
+            bust0: { label: 'バスト 0°', unit: 'cm' },
+            underbust0: { label: 'アンダー 0°', unit: 'cm' },
+            bust30: { label: 'バスト 30°', unit: 'cm' },
+            underbust30: { label: 'アンダー 30°', unit: 'cm' },
+            waist: { label: 'ウエスト', unit: 'cm' },
+            hip: { label: 'ヒップ', unit: 'cm' },
+            thigh: { label: '太もも', unit: 'cm' },
+            soymilk: { label: '豆乳', unit: 'ml' }
+        };
+
+        window.onload = function() {
+            document.getElementById('date').valueAsDate = new Date();
+            loadGoals();
+            displayData();
+        };
+
+        function switchTab(tabId, element) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+            
+            document.getElementById('tab-' + tabId).classList.add('active');
+            element.classList.add('active');
+            
+            const titles = { 'input': '記録', 'graph': 'グラフ', 'history': '履歴', 'settings': '設定' };
+            document.querySelector('header').textContent = titles[tabId];
+
+            if (tabId === 'graph') displayData(); 
+        }
+
+        function saveGoals() {
+            const goals = {};
+            for (let key in metricInfo) {
+                goals[key] = document.getElementById('goal_' + key).value;
+            }
+            localStorage.setItem('bodyGoals', JSON.stringify(goals));
+            alert("すべての目標を保存しました！");
+            displayData();
+        }
+
+        function loadGoals() {
+            const savedGoals = JSON.parse(localStorage.getItem('bodyGoals')) || {};
+            for (let key in metricInfo) {
+                if(savedGoals[key]) {
+                    document.getElementById('goal_' + key).value = savedGoals[key];
+                }
+            }
+        }
+
+        function saveData() {
+            const date = document.getElementById('date').value;
+            if(!date) return alert("日付を入力してください");
+
+            const record = { date: date };
+            for (let key in metricInfo) {
+                record[key] = document.getElementById(key).value;
+            }
+
+            let records = JSON.parse(localStorage.getItem('bodyRecords')) || [];
+            const index = records.findIndex(r => r.date === date);
+            if (index >= 0) records[index] = record; else records.push(record);
+            
+            records.sort((a, b) => new Date(b.date) - new Date(a.date));
+            localStorage.setItem('bodyRecords', JSON.stringify(records));
+            
+            for (let key in metricInfo) document.getElementById(key).value = '';
+            
+            displayData();
+            
+            const btn = document.querySelector('#tab-input .save-btn');
+            btn.textContent = "保存完了！";
+            btn.style.backgroundColor = "#34c759";
+            setTimeout(() => { btn.textContent = "記録する"; btn.style.backgroundColor = "var(--accent)"; }, 1500);
+        }
+
+        function displayData() {
+            let records = JSON.parse(localStorage.getItem('bodyRecords')) || [];
+            let tbody = document.querySelector('#recordTable tbody');
+            tbody.innerHTML = '';
+
+            records.forEach(record => {
+                let rowHtml = `<td>${record.date}</td>`;
+                for (let key in metricInfo) {
+                    rowHtml += `<td>${record[key] || ''}</td>`;
+                }
+                tbody.innerHTML += `<tr>${rowHtml}</tr>`;
+            });
+
+            if(document.getElementById('tab-graph').classList.contains('active')) {
+                drawChart(records);
+            }
+        }
+
+        function drawChart(records) {
+            let chartData = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
+            const selectedMetric = document.getElementById('graphMetric').value;
+            const info = metricInfo[selectedMetric];
+
+            const labels = chartData.map(r => r.date.slice(5)); 
+            const dataPoints = chartData.map(r => r[selectedMetric] ? parseFloat(r[selectedMetric]) : null);
+            
+            const savedGoals = JSON.parse(localStorage.getItem('bodyGoals')) || {};
+            const targetVal = parseFloat(savedGoals[selectedMetric]);
+            
+            const targetPoints = labels.map(() => !isNaN(targetVal) ? targetVal : null);
+
+            const ctx = document.getElementById('myChart').getContext('2d');
+            if (myChartInstance) myChartInstance.destroy();
+
+            let chartDatasets = [
+                { 
+                    label: `${info.label} (${info.unit})`, 
+                    data: dataPoints, 
+                    borderColor: '#0a84ff', 
+                    backgroundColor: '#0a84ff', 
+                    borderWidth: 3, 
+                    pointRadius: 4, 
+                    spanGaps: true, 
+                    tension: 0.3 
+                }
+            ];
+
+            if (!isNaN(targetVal)) {
+                chartDatasets.push({
+                    label: `目標`, 
+                    data: targetPoints, 
+                    borderColor: '#34c759', 
+                    backgroundColor: '#34c759',
+                    borderWidth: 2, 
+                    pointRadius: labels.length <= 1 ? 4 : 0, 
+                    fill: false
+                });
+            }
+
+            myChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: chartDatasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { labels: { color: '#ebebf599' } } },
+                    scales: {
+                        x: { ticks: { color: '#ebebf599' }, grid: { color: '#38383a' } },
+                        y: { ticks: { color: '#ebebf599' }, grid: { color: '#38383a' } }
+                    }
+                }
+            });
+        }
+
+        // CSVエクスポート（閲覧・分析用）
+        function exportCSV() {
+            let records = JSON.parse(localStorage.getItem('bodyRecords')) || [];
+            if(records.length === 0) return alert("出力するデータがありません");
+
+            let csvContent = "\uFEFF"; 
+            let headers = ["日付"];
+            for (let key in metricInfo) headers.push(metricInfo[key].label);
+            csvContent += headers.join(",") + "\n";
+
+            records.forEach(record => {
+                let row = [record.date];
+                for (let key in metricInfo) row.push(record[key] || "");
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "smartrecord_data.csv";
+            link.click();
+        }
+
+        // ★新規追加: JSONバックアップ出力（引き継ぎ用）
+        function exportBackup() {
+            const backupData = {
+                records: JSON.parse(localStorage.getItem('bodyRecords')) || [],
+                goals: JSON.parse(localStorage.getItem('bodyGoals')) || {}
+            };
+            
+            if(backupData.records.length === 0 && Object.keys(backupData.goals).length === 0) {
+                return alert("引き継ぐデータがありません");
+            }
+
+            const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "smartrecord_backup.json";
+            link.click();
+        }
+
+        // ★新規追加: JSONバックアップ読み込み（引き継ぎ復元）
+        function importBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.records) localStorage.setItem('bodyRecords', JSON.stringify(data.records));
+                    if (data.goals) localStorage.setItem('bodyGoals', JSON.stringify(data.goals));
+                    
+                    loadGoals();
+                    displayData();
+                    alert("データの引き継ぎ（復元）が完了しました！");
+                } catch (error) {
+                    alert("エラー: 正しい引き継ぎファイル（.json）を選択してください。");
+                }
+            };
+            reader.readAsText(file);
+            
+            // 同じファイルを再度選択できるようにクリア
+            event.target.value = '';
+        }
+    </script>
+</body>
+</html>
