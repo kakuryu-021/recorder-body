@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Recorder-Body</title>
-    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="icon" type="image/png" href="icon-.png">
     <link rel="apple-touch-icon" href="icon.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -44,12 +44,8 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         #tab-graph.active {
-            display: flex;
-            flex-direction: column;
-            max-width: 100%; 
-            padding: 10px 5px; 
-            height: calc(100vh - 160px); 
-            box-sizing: border-box;
+            display: flex; flex-direction: column; max-width: 100%; 
+            padding: 10px 5px; height: calc(100vh - 160px); box-sizing: border-box;
         }
         .graph-header { display: flex; justify-content: flex-end; padding: 0 10px 10px 0; }
         select.graph-selector {
@@ -61,12 +57,19 @@
 
         .form-group { background: var(--card-color); padding: 12px 15px; margin-bottom: 10px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
         label { font-size: 0.95em; font-weight: 500; }
-        input[type="number"], input[type="date"] { 
+        
+        input[type="number"], input[type="date"], textarea { 
             width: 45%; padding: 8px; text-align: right; font-size: 1em;
             background-color: transparent; border: none; color: var(--text-main); outline: none; color-scheme: dark;
         }
-        input::placeholder { color: var(--text-sub); }
+        input::placeholder, textarea::placeholder { color: var(--text-sub); }
         
+        /* メモ欄専用のスタイル */
+        textarea {
+            width: 100%; text-align: left; border: 1px solid var(--border); 
+            border-radius: 8px; margin-top: 10px; resize: vertical; box-sizing: border-box;
+        }
+
         button.save-btn { 
             width: 100%; padding: 16px; background-color: var(--accent); color: white; 
             border: none; border-radius: 12px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin-top: 15px; 
@@ -77,6 +80,9 @@
         th, td { border-bottom: 1px solid var(--border); padding: 12px 8px; text-align: center; white-space: nowrap; }
         th { color: var(--text-sub); font-weight: normal; }
         tr:last-child td { border-bottom: none; }
+        
+        /* 履歴テーブルのメモ列は長すぎないように省略記号(...)にする */
+        .memo-cell { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 
         nav {
             position: fixed; bottom: 0; left: 0; width: 100%;
@@ -101,7 +107,8 @@
 
     <div id="tab-input" class="tab-content active">
         <div class="form-group" style="background: transparent; border: 1px solid var(--border);">
-            <label>日付</label><input type="date" id="date" required style="width: 60%;">
+            <label>日付</label>
+            <input type="date" id="date" required style="width: 60%;" onchange="loadRecordForDate()">
         </div>
         <div class="form-group"><label>体重 (kg)</label><input type="number" id="weight" step="0.1" inputmode="decimal" placeholder="0.0"></div>
         <div class="form-group"><label>体脂肪率 (%)</label><input type="number" id="bodyfat" step="0.1" inputmode="decimal" placeholder="0.0"></div>
@@ -115,6 +122,11 @@
         <div class="form-group"><label>ヒップ (cm)</label><input type="number" id="hip" step="0.1" inputmode="decimal" placeholder="0.0"></div>
         <div class="form-group"><label>太もも (cm)</label><input type="number" id="thigh" step="0.1" inputmode="decimal" placeholder="0.0"></div>
         <div class="form-group"><label>豆乳 (ml)</label><input type="number" id="soymilk" step="10" inputmode="numeric" placeholder="0"></div>
+        
+        <div class="form-group" style="flex-direction: column; align-items: flex-start;">
+            <label>今日のメモ</label>
+            <textarea id="memo" rows="3" placeholder="体調の変化、筋トレ内容、気づきなど..."></textarea>
+        </div>
 
         <button class="save-btn" onclick="saveData()">記録する</button>
     </div>
@@ -145,7 +157,7 @@
         <div class="table-container">
             <table id="recordTable">
                 <thead>
-                    <tr><th>日付</th><th>体重</th><th>体脂肪</th><th>筋肉量</th><th>代謝</th><th>B(0)</th><th>UB(0)</th><th>B(30)</th><th>UB(30)</th><th>W</th><th>H</th><th>太もも</th><th>豆乳</th></tr>
+                    <tr><th>日付</th><th>体重</th><th>体脂肪</th><th>筋肉量</th><th>代謝</th><th>B(0)</th><th>UB(0)</th><th>B(30)</th><th>UB(30)</th><th>W</th><th>H</th><th>太もも</th><th>豆乳</th><th>メモ</th></tr>
                 </thead>
                 <tbody></tbody>
             </table>
@@ -210,8 +222,30 @@
         window.onload = function() {
             document.getElementById('date').valueAsDate = new Date();
             loadGoals();
+            loadRecordForDate(); // 今日のデータがあれば自動読み込み
             displayData();
         };
+
+        // 日付に応じた既存データをフォームに読み込む機能
+        function loadRecordForDate() {
+            const date = document.getElementById('date').value;
+            let records = JSON.parse(localStorage.getItem('bodyRecords')) || [];
+            const existingRecord = records.find(r => r.date === date);
+
+            if (existingRecord) {
+                // 既存データがある場合はフォームにセット
+                for (let key in metricInfo) {
+                    document.getElementById(key).value = existingRecord[key] || '';
+                }
+                document.getElementById('memo').value = existingRecord.memo || '';
+            } else {
+                // 無い場合はフォームを空にする
+                for (let key in metricInfo) {
+                    document.getElementById(key).value = '';
+                }
+                document.getElementById('memo').value = '';
+            }
+        }
 
         function switchTab(tabId, element) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
@@ -249,7 +283,11 @@
             const date = document.getElementById('date').value;
             if(!date) return alert("日付を入力してください");
 
-            const record = { date: date };
+            // メモも含めてレコードを作成
+            const record = { 
+                date: date,
+                memo: document.getElementById('memo').value
+            };
             for (let key in metricInfo) {
                 record[key] = document.getElementById(key).value;
             }
@@ -261,8 +299,7 @@
             records.sort((a, b) => new Date(b.date) - new Date(a.date));
             localStorage.setItem('bodyRecords', JSON.stringify(records));
             
-            for (let key in metricInfo) document.getElementById(key).value = '';
-            
+            // 保存完了の演出のみ（入力内容はそのまま残すことで連続編集しやすく）
             displayData();
             
             const btn = document.querySelector('#tab-input .save-btn');
@@ -281,6 +318,8 @@
                 for (let key in metricInfo) {
                     rowHtml += `<td>${record[key] || ''}</td>`;
                 }
+                // メモをテーブルの最後に追加
+                rowHtml += `<td class="memo-cell" title="${record.memo || ''}">${record.memo || ''}</td>`;
                 tbody.innerHTML += `<tr>${rowHtml}</tr>`;
             });
 
@@ -348,7 +387,7 @@
             });
         }
 
-        // CSVエクスポート（閲覧・分析用）
+        // CSVエクスポート
         function exportCSV() {
             let records = JSON.parse(localStorage.getItem('bodyRecords')) || [];
             if(records.length === 0) return alert("出力するデータがありません");
@@ -356,11 +395,17 @@
             let csvContent = "\uFEFF"; 
             let headers = ["日付"];
             for (let key in metricInfo) headers.push(metricInfo[key].label);
+            headers.push("メモ"); // CSVのヘッダーにメモを追加
             csvContent += headers.join(",") + "\n";
 
             records.forEach(record => {
                 let row = [record.date];
                 for (let key in metricInfo) row.push(record[key] || "");
+                
+                // メモ内にカンマや改行がある場合を考慮してダブルクォーテーションで囲む
+                let memoStr = record.memo ? `"${record.memo.replace(/"/g, '""')}"` : "";
+                row.push(memoStr);
+
                 csvContent += row.join(",") + "\n";
             });
 
@@ -371,7 +416,7 @@
             link.click();
         }
 
-        // ★新規追加: JSONバックアップ出力（引き継ぎ用）
+        // JSONバックアップ出力
         function exportBackup() {
             const backupData = {
                 records: JSON.parse(localStorage.getItem('bodyRecords')) || [],
@@ -389,7 +434,7 @@
             link.click();
         }
 
-        // ★新規追加: JSONバックアップ読み込み（引き継ぎ復元）
+        // JSONバックアップ読み込み
         function importBackup(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -403,6 +448,7 @@
                     if (data.goals) localStorage.setItem('bodyGoals', JSON.stringify(data.goals));
                     
                     loadGoals();
+                    loadRecordForDate();
                     displayData();
                     alert("データの引き継ぎ（復元）が完了しました！");
                 } catch (error) {
@@ -410,8 +456,6 @@
                 }
             };
             reader.readAsText(file);
-            
-            // 同じファイルを再度選択できるようにクリア
             event.target.value = '';
         }
     </script>
